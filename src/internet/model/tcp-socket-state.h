@@ -107,6 +107,7 @@ class TcpSocketState : public Object
         Off = 0,        //!< Disable
         On = 1,         //!< Enable
         AcceptOnly = 2, //!< Enable only when the peer endpoint is ECN capable
+        // EcnpOn = 3,     //!< Use ECN+ (mark SYN/ACK packets)
     };
 
     /**
@@ -128,6 +129,8 @@ class TcpSocketState : public Object
         ClassicEcn, //!< ECN functionality as described in RFC 3168.
         DctcpEcn,   //!< ECN functionality as described in RFC 8257. Note: this mode is specific to
                     //!< DCTCP.
+        EcnpEcn,    //!< ECN functionality extension to TCP SYN/ACK packets as described in RFC
+                    //!< 5562.
     };
 
     /**
@@ -203,8 +206,8 @@ class TcpSocketState : public Object
 
     Ptr<TcpRxBuffer> m_rxBuffer; //!< Rx buffer (reordering buffer)
 
-    EcnMode_t m_ecnMode{ClassicEcn}; //!< ECN mode
-    UseEcn_t m_useEcn{Off};          //!< Socket ECN capability
+    EcnMode_t m_ecnMode{EcnpEcn}; //!< ECN mode
+    UseEcn_t m_useEcn{Off};       //!< Socket ECN capability
 
     EcnCodePoint_t m_ectCodePoint{Ect0}; //!< ECT code point to use
 

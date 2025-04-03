@@ -72,6 +72,15 @@ const std::map<std::pair<ns3::TcpSocketBase::TcpPacketType_t, ns3::TcpSocketStat
         {{ns3::TcpSocketBase::RE_XMT, ns3::TcpSocketState::ClassicEcn}, false},
         {{ns3::TcpSocketBase::DATA, ns3::TcpSocketState::ClassicEcn}, true},
 
+        {{ns3::TcpSocketBase::SYN, ns3::TcpSocketState::EcnpEcn}, false},
+        {{ns3::TcpSocketBase::SYN_ACK, ns3::TcpSocketState::EcnpEcn}, true},
+        {{ns3::TcpSocketBase::PURE_ACK, ns3::TcpSocketState::EcnpEcn}, false},
+        {{ns3::TcpSocketBase::WINDOW_PROBE, ns3::TcpSocketState::EcnpEcn}, false},
+        {{ns3::TcpSocketBase::FIN, ns3::TcpSocketState::EcnpEcn}, false},
+        {{ns3::TcpSocketBase::RST, ns3::TcpSocketState::EcnpEcn}, false},
+        {{ns3::TcpSocketBase::RE_XMT, ns3::TcpSocketState::EcnpEcn}, false},
+        {{ns3::TcpSocketBase::DATA, ns3::TcpSocketState::EcnpEcn}, true},
+
         {{ns3::TcpSocketBase::SYN, ns3::TcpSocketState::DctcpEcn}, true},
         {{ns3::TcpSocketBase::SYN_ACK, ns3::TcpSocketState::DctcpEcn}, true},
         {{ns3::TcpSocketBase::PURE_ACK, ns3::TcpSocketState::DctcpEcn}, true},
@@ -3104,7 +3113,9 @@ TcpSocketBase::AddSocketTags(const Ptr<Packet>& p, bool isEct) const
     if (GetIpTos())
     {
         SocketIpTosTag ipTosTag;
-        if (m_tcb->m_ecnState != TcpSocketState::ECN_DISABLED && !CheckNoEcn(GetIpTos()) && isEct)
+        if (((m_tcb->m_ecnState != TcpSocketState::ECN_DISABLED && !CheckNoEcn(GetIpTos())) ||
+             m_tcb->m_ecnMode == TcpSocketState::EcnpEcn) &&
+            isEct)
         {
             ipTosTag.SetTos(MarkEcnCodePoint(GetIpTos(), m_tcb->m_ectCodePoint));
         }
@@ -3117,7 +3128,9 @@ TcpSocketBase::AddSocketTags(const Ptr<Packet>& p, bool isEct) const
     }
     else
     {
-        if ((m_tcb->m_ecnState != TcpSocketState::ECN_DISABLED && p->GetSize() > 0 && isEct) ||
+        if ((((m_tcb->m_ecnState != TcpSocketState::ECN_DISABLED && p->GetSize() > 0) ||
+              m_tcb->m_ecnMode == TcpSocketState::EcnpEcn) &&
+             isEct) ||
             m_tcb->m_ecnMode == TcpSocketState::DctcpEcn)
         {
             SocketIpTosTag ipTosTag;
@@ -3129,7 +3142,8 @@ TcpSocketBase::AddSocketTags(const Ptr<Packet>& p, bool isEct) const
     if (IsManualIpv6Tclass())
     {
         SocketIpv6TclassTag ipTclassTag;
-        if (m_tcb->m_ecnState != TcpSocketState::ECN_DISABLED && !CheckNoEcn(GetIpv6Tclass()) &&
+        if (((m_tcb->m_ecnState != TcpSocketState::ECN_DISABLED && !CheckNoEcn(GetIpv6Tclass())) ||
+             m_tcb->m_ecnMode == TcpSocketState::EcnpEcn) &&
             isEct)
         {
             ipTclassTag.SetTclass(MarkEcnCodePoint(GetIpv6Tclass(), m_tcb->m_ectCodePoint));
@@ -3143,7 +3157,9 @@ TcpSocketBase::AddSocketTags(const Ptr<Packet>& p, bool isEct) const
     }
     else
     {
-        if ((m_tcb->m_ecnState != TcpSocketState::ECN_DISABLED && p->GetSize() > 0 && isEct) ||
+        if ((((m_tcb->m_ecnState != TcpSocketState::ECN_DISABLED && p->GetSize() > 0) ||
+              m_tcb->m_ecnMode == TcpSocketState::EcnpEcn) &&
+             isEct) ||
             m_tcb->m_ecnMode == TcpSocketState::DctcpEcn)
         {
             SocketIpv6TclassTag ipTclassTag;
@@ -4801,6 +4817,10 @@ TcpSocketBase::SetUseEcn(TcpSocketState::UseEcn_t useEcn)
 {
     NS_LOG_FUNCTION(this << useEcn);
     m_tcb->m_useEcn = useEcn;
+    if (useEcn == TcpSocketState::On && m_tcb->m_ecnMode == TcpSocketState::EcnpEcn)
+    {
+        m_tcb->m_ecnState = TcpSocketState::ECN_IDLE;
+    }
 }
 
 uint32_t
