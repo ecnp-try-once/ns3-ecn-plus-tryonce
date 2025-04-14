@@ -2823,7 +2823,26 @@ TcpSocketBase::SendEmptyPacket(uint8_t flags)
     }
 
     NS_ASSERT_MSG(packetType != TcpPacketType_t::INVALID, "Invalid TCP packet type");
+
+    // TODO: Temporarily marking the SYN-ACK with CE. Remove this.
+    static bool done = false;
+    if (m_tcb->m_ecnMode == TcpSocketState::EcnpEcn && packetType == TcpPacketType_t::SYN_ACK)
+    {
+        if (!done)
+        {
+            m_tcb->m_ectCodePoint = TcpSocketState::CongExp;
+        }
+        else
+        {
+            m_tcb->m_ectCodePoint = TcpSocketState::NotECT;
+        }
+    }
     AddSocketTags(p, IsEct(packetType));
+    if (m_tcb->m_ecnMode == TcpSocketState::EcnpEcn && packetType == TcpPacketType_t::SYN_ACK)
+    {
+        m_tcb->m_ectCodePoint = TcpSocketState::Ect0;
+        done = true;
+    }
 
     header.SetFlags(flags);
     header.SetSequenceNumber(s);
