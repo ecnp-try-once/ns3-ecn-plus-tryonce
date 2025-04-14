@@ -1233,13 +1233,23 @@ TcpSocketBase::ForwardUp(Ptr<Packet> packet,
         return;
     }
 
-    if (header.GetEcn() == Ipv4Header::ECN_CE && m_ecnCESeq < tcpHeader.GetSequenceNumber())
+    if (header.GetEcn() == Ipv4Header::ECN_CE)
     {
-        NS_LOG_INFO("Received CE flag is valid");
-        NS_LOG_DEBUG(TcpSocketState::EcnStateName[m_tcb->m_ecnState] << " -> ECN_CE_RCVD");
-        m_ecnCESeq = tcpHeader.GetSequenceNumber();
-        m_tcb->m_ecnState = TcpSocketState::ECN_CE_RCVD;
-        m_congestionControl->CwndEvent(m_tcb, TcpSocketState::CA_EVENT_ECN_IS_CE);
+        if (m_ecnCESeq < tcpHeader.GetSequenceNumber())
+        {
+            NS_LOG_INFO("Received CE flag is valid");
+            NS_LOG_DEBUG(TcpSocketState::EcnStateName[m_tcb->m_ecnState] << " -> ECN_CE_RCVD");
+            m_ecnCESeq = tcpHeader.GetSequenceNumber();
+            m_tcb->m_ecnState = TcpSocketState::ECN_CE_RCVD;
+            m_congestionControl->CwndEvent(m_tcb, TcpSocketState::CA_EVENT_ECN_IS_CE);
+        }
+        else if (m_tcb->m_ecnMode == TcpSocketState::EcnpEcn &&
+                 (tcpHeader.GetFlags() & TcpHeader::SYN) && (tcpHeader.GetFlags() & TcpHeader::ACK))
+        {
+            NS_LOG_INFO("SYN-ACK received with CE flag");
+            NS_LOG_DEBUG(TcpSocketState::EcnStateName[m_tcb->m_ecnState] << " -> ECN_CE_RCVD");
+            m_tcb->m_ecnState = TcpSocketState::ECN_CE_RCVD;
+        }
     }
     else if (header.GetEcn() != Ipv4Header::ECN_NotECT &&
              m_tcb->m_ecnState != TcpSocketState::ECN_DISABLED)
@@ -2361,7 +2371,22 @@ TcpSocketBase::ProcessSynSent(Ptr<Packet> packet, const TcpHeader& tcpHeader)
     }
     else if (tcpflags & (TcpHeader::SYN | TcpHeader::ACK) &&
              m_tcb->m_nextTxSequence + SequenceNumber32(1) == tcpHeader.GetAckNumber())
-    { // Handshake completed
+    {
+        if (m_tcb->m_ecnMode == TcpSocketState::EcnpEcn &&
+            m_tcb->m_ecnState == TcpSocketState::ECN_CE_RCVD)
+        {
+            m_retxEvent.Cancel();
+            m_tcb->m_rxBuffer->SetNextRxSequence(tcpHeader.GetSequenceNumber() +
+                                                 SequenceNumber32(1));
+            m_tcb->m_highTxMark = ++m_tcb->m_nextTxSequence;
+            m_tcb->m_ecnState = TcpSocketState::ECN_IDLE;
+
+            NS_LOG_INFO("Sending ACK with ECE in response to a SYN-ACK received with CE");
+            SendEmptyPacket(TcpHeader::ACK | TcpHeader::ECE);
+            return;
+        }
+
+        // Handshake completed
         NS_LOG_DEBUG("SYN_SENT -> ESTABLISHED");
         m_congestionControl->CongestionStateSet(m_tcb, TcpSocketState::CA_OPEN);
         m_tcb->m_congState = TcpSocketState::CA_OPEN;
