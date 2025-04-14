@@ -2410,7 +2410,8 @@ TcpSocketBase::ProcessSynSent(Ptr<Packet> packet, const TcpHeader& tcpHeader)
             NS_LOG_DEBUG(TcpSocketState::EcnStateName[m_tcb->m_ecnState] << " -> ECN_IDLE");
             m_tcb->m_ecnState = TcpSocketState::ECN_IDLE;
         }
-        else
+        else if (m_tcb->m_ecnMode != TcpSocketState::EcnpEcn ||
+                 m_tcb->m_ecnState != TcpSocketState::ECN_IDLE)
         {
             m_tcb->m_ecnState = TcpSocketState::ECN_DISABLED;
         }
