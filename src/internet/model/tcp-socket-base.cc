@@ -2443,13 +2443,26 @@ TcpSocketBase::ProcessSynRcvd(Ptr<Packet> packet,
     NS_LOG_FUNCTION(this << tcpHeader);
 
     // Extract the flags. PSH, URG, CWR and ECE are disregarded.
-    uint8_t tcpflags =
-        tcpHeader.GetFlags() & ~(TcpHeader::PSH | TcpHeader::URG | TcpHeader::CWR | TcpHeader::ECE);
+    uint8_t tcpflags = tcpHeader.GetFlags();
+    bool isEce = tcpflags & TcpHeader::ECE;
+    tcpflags &= ~(TcpHeader::PSH | TcpHeader::URG | TcpHeader::CWR | TcpHeader::ECE);
 
     if (tcpflags == 0 ||
         (tcpflags == TcpHeader::ACK &&
          m_tcb->m_nextTxSequence + SequenceNumber32(1) == tcpHeader.GetAckNumber()))
-    { // If it is bare data, accept it and move to ESTABLISHED state. This is
+    {
+        if (m_tcb->m_ecnMode == TcpSocketState::EcnpEcn && isEce)
+        {
+            m_retxEvent.Cancel();
+            m_tcb->m_rxBuffer->SetNextRxSequence(tcpHeader.GetSequenceNumber() +
+                                                 SequenceNumber32(1));
+            m_tcb->m_highTxMark = ++m_tcb->m_nextTxSequence;
+
+            SendEmptyPacket(TcpHeader::SYN | TcpHeader::ACK);
+            return;
+        }
+
+        // If it is bare data, accept it and move to ESTABLISHED state. This is
         // possibly due to ACK lost in 3WHS. If in-sequence ACK is received, the
         // handshake is completed nicely.
         NS_LOG_DEBUG("SYN_RCVD -> ESTABLISHED");
