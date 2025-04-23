@@ -2459,9 +2459,6 @@ TcpSocketBase::ProcessSynRcvd(Ptr<Packet> packet,
                                                  SequenceNumber32(1));
             m_tcb->m_highTxMark = ++m_tcb->m_nextTxSequence;
 
-            // Reduce congestion window to one segment
-            m_tcb->m_cWnd = m_tcb->m_segmentSize;
-
             SendEmptyPacket(TcpHeader::SYN | TcpHeader::ACK);
             return;
         }
