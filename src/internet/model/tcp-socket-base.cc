@@ -2375,6 +2375,12 @@ TcpSocketBase::ProcessSynSent(Ptr<Packet> packet, const TcpHeader& tcpHeader)
         if (m_tcb->m_ecnMode == TcpSocketState::EcnpEcn &&
             m_tcb->m_ecnState == TcpSocketState::ECN_CE_RCVD)
         {
+            // NOTE: This can be uncommented to simulate SYN-ACK packet drop.
+            //
+            // m_tcb->m_ecnState = TcpSocketState::ECN_IDLE;
+            // m_retxEvent.Cancel();
+            // return;
+
             m_retxEvent.Cancel();
             m_tcb->m_rxBuffer->SetNextRxSequence(tcpHeader.GetSequenceNumber() +
                                                  SequenceNumber32(1));
@@ -2986,6 +2992,13 @@ TcpSocketBase::SendEmptyPacket(uint8_t flags)
 
     if (m_retxEvent.IsExpired() && (hasSyn || hasFin) && !isAck)
     { // Retransmit SYN / SYN+ACK / FIN / FIN+ACK to guard against lost
+        if (m_tcb->m_ecnMode == TcpSocketState::EcnpEcn and (flags & TcpHeader::SYN) and
+            (flags & TcpHeader::ACK))
+        {
+            flags &= ~TcpHeader::CWR;
+            flags &= ~TcpHeader::ECE;
+        }
+
         NS_LOG_LOGIC("Schedule retransmission timeout at time "
                      << Simulator::Now().GetSeconds() << " to expire at time "
                      << (Simulator::Now() + m_rto.Get()).GetSeconds());
