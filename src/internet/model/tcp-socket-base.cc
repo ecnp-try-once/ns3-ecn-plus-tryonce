@@ -2369,7 +2369,7 @@ TcpSocketBase::ProcessSynSent(Ptr<Packet> packet, const TcpHeader& tcpHeader)
             SendEmptyPacket(TcpHeader::SYN | TcpHeader::ACK);
         }
     }
-    else if (tcpflags & (TcpHeader::SYN | TcpHeader::ACK) &&
+    else if ((tcpflags & (TcpHeader::SYN | TcpHeader::ACK)) == (TcpHeader::SYN | TcpHeader::ACK) &&
              m_tcb->m_nextTxSequence + SequenceNumber32(1) == tcpHeader.GetAckNumber())
     {
         if (m_tcb->m_ecnMode == TcpSocketState::EcnpEcn &&
