@@ -2872,25 +2872,28 @@ TcpSocketBase::SendEmptyPacket(uint8_t flags)
 
     NS_ASSERT_MSG(packetType != TcpPacketType_t::INVALID, "Invalid TCP packet type");
 
-    // TODO: Temporarily marking the SYN-ACK with CE. Remove this.
-    static bool done = false;
-    if (m_tcb->m_ecnMode == TcpSocketState::EcnpEcn && packetType == TcpPacketType_t::SYN_ACK)
-    {
-        if (!done)
-        {
-            m_tcb->m_ectCodePoint = TcpSocketState::CongExp;
-        }
-        else
-        {
-            m_tcb->m_ectCodePoint = TcpSocketState::NotECT;
-        }
-    }
+    // NOTE: Uncomment this and the next comment to force CE on the first SYN-ACK packet.
+    //
+    // static bool first_synack = true;
+    // if (m_tcb->m_ecnMode == TcpSocketState::EcnpEcn && packetType == TcpPacketType_t::SYN_ACK)
+    // {
+    //     if (first_synack)
+    //     {
+    //         m_tcb->m_ectCodePoint = TcpSocketState::CongExp;
+    //     }
+    //     else
+    //     {
+    //         m_tcb->m_ectCodePoint = TcpSocketState::NotECT;
+    //     }
+    // }
+
     AddSocketTags(p, IsEct(packetType));
-    if (m_tcb->m_ecnMode == TcpSocketState::EcnpEcn && packetType == TcpPacketType_t::SYN_ACK)
-    {
-        m_tcb->m_ectCodePoint = TcpSocketState::Ect0;
-        done = true;
-    }
+
+    // if (m_tcb->m_ecnMode == TcpSocketState::EcnpEcn && packetType == TcpPacketType_t::SYN_ACK)
+    // {
+    //     m_tcb->m_ectCodePoint = TcpSocketState::Ect0;
+    //     first_synack = false;
+    // }
 
     header.SetFlags(flags);
     header.SetSequenceNumber(s);
