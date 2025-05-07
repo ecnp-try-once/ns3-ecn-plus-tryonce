@@ -2468,6 +2468,9 @@ TcpSocketBase::ProcessSynRcvd(Ptr<Packet> packet,
             // Reduce congestion window to one segment
             m_tcb->m_cWnd = m_tcb->m_segmentSize;
 
+            // Reset the retransmission counter
+            m_synCount = m_synRetries;
+
             SendEmptyPacket(TcpHeader::SYN | TcpHeader::ACK);
             return;
         }
