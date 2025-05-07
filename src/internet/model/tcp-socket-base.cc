@@ -2372,24 +2372,39 @@ TcpSocketBase::ProcessSynSent(Ptr<Packet> packet, const TcpHeader& tcpHeader)
     else if ((tcpflags & (TcpHeader::SYN | TcpHeader::ACK)) == (TcpHeader::SYN | TcpHeader::ACK) &&
              m_tcb->m_nextTxSequence + SequenceNumber32(1) == tcpHeader.GetAckNumber())
     {
-        if (m_tcb->m_ecnMode == TcpSocketState::EcnpEcn &&
-            m_tcb->m_ecnState == TcpSocketState::ECN_CE_RCVD)
+        if (m_tcb->m_ecnMode == TcpSocketState::EcnpEcn)
         {
-            // NOTE: This can be uncommented to simulate SYN-ACK packet drop.
-            //
-            // m_tcb->m_ecnState = TcpSocketState::ECN_IDLE;
-            // m_retxEvent.Cancel();
-            // return;
+            if (m_tcb->m_ecnState == TcpSocketState::ECN_CE_RCVD)
+            {
+                m_retxEvent.Cancel();
+                m_tcb->m_rxBuffer->SetNextRxSequence(tcpHeader.GetSequenceNumber() +
+                                                     SequenceNumber32(1));
+                m_tcb->m_highTxMark = ++m_tcb->m_nextTxSequence;
+                m_tcb->m_ecnState = TcpSocketState::ECN_IDLE;
 
-            m_retxEvent.Cancel();
-            m_tcb->m_rxBuffer->SetNextRxSequence(tcpHeader.GetSequenceNumber() +
-                                                 SequenceNumber32(1));
-            m_tcb->m_highTxMark = ++m_tcb->m_nextTxSequence;
-            m_tcb->m_ecnState = TcpSocketState::ECN_IDLE;
+                NS_LOG_INFO("Sending ACK with ECE in response to a SYN-ACK received with CE");
+                SendEmptyPacket(TcpHeader::ACK | TcpHeader::ECE);
+                return;
+            }
+            else
+            {
+                // This is the SYN-ACK retransmitted after the first one was marked with CE
 
-            NS_LOG_INFO("Sending ACK with ECE in response to a SYN-ACK received with CE");
-            SendEmptyPacket(TcpHeader::ACK | TcpHeader::ECE);
-            return;
+                // NOTE: Uncomment the following to simulate drop on the first no-ECT SYN-ACK
+                // static bool first = true;
+                //
+                // if (first)
+                // {
+                //     m_tcb->m_ecnState = TcpSocketState::ECN_IDLE;
+                //     m_retxEvent.Cancel();
+                //     first = false;
+                //     return;
+                // }
+
+                // NOTE: Uncomment the following to simulate drop on all no-ECT SYN-ACKs
+                //
+                // return;
+            }
         }
 
         // Handshake completed
