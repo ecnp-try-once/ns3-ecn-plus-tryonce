@@ -1454,6 +1454,12 @@ class TcpSocketBase : public TcpSocket
     // Pacing related variable
     Timer m_pacingTimer{Timer::CANCEL_ON_DESTROY}; //!< Pacing Event
 
+    bool m_markSynAck; //!< If the first SYN-ACK packet is to be marked with CE
+    bool m_dropFirst;  //!< If the first SYN-ACK packet (retransmitted without ECT) is to
+                       //!< be dropped
+    bool m_dropAll;    //!< If all SYN-ACK packets (retransmitted without ECT) are to be
+                       //!< dropped
+
     // Parameters related to Explicit Congestion Notification
     TracedValue<SequenceNumber32> m_ecnEchoSeq{
         0}; //!< Sequence number of the last received ECN Echo

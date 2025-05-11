@@ -203,6 +203,21 @@ TcpSocketBase::GetTypeId()
                                           "On",
                                           TcpSocketState::AcceptOnly,
                                           "AcceptOnly"))
+            .AddAttribute("MarkSynAck",
+                          "Set CE on first SYN-ACK packet",
+                          BooleanValue(true),
+                          MakeBooleanAccessor(&TcpSocketBase::m_markSynAck),
+                          MakeBooleanChecker())
+            .AddAttribute("DropFirst",
+                          "Drop first non-ECT SYN-ACK packet",
+                          BooleanValue(false),
+                          MakeBooleanAccessor(&TcpSocketBase::m_dropFirst),
+                          MakeBooleanChecker())
+            .AddAttribute("DropAll",
+                          "Drop all non-ECT SYN-ACK packets",
+                          BooleanValue(false),
+                          MakeBooleanAccessor(&TcpSocketBase::m_dropAll),
+                          MakeBooleanChecker())
             .AddTraceSource("RTO",
                             "Retransmission timeout",
                             MakeTraceSourceAccessor(&TcpSocketBase::m_rto),
@@ -410,6 +425,9 @@ TcpSocketBase::TcpSocketBase(const TcpSocketBase& sock)
       m_txTrace(sock.m_txTrace),
       m_rxTrace(sock.m_rxTrace),
       m_pacingTimer(Timer::CANCEL_ON_DESTROY),
+      m_markSynAck(sock.m_markSynAck),
+      m_dropFirst(sock.m_dropFirst),
+      m_dropAll(sock.m_dropAll),
       m_ecnEchoSeq(sock.m_ecnEchoSeq),
       m_ecnCESeq(sock.m_ecnCESeq),
       m_ecnCWRSeq(sock.m_ecnCWRSeq)
@@ -2390,20 +2408,29 @@ TcpSocketBase::ProcessSynSent(Ptr<Packet> packet, const TcpHeader& tcpHeader)
             {
                 // This is the SYN-ACK retransmitted after the first one was marked with CE
 
-                // NOTE: Uncomment the following to simulate drop on the first no-ECT SYN-ACK
-                // static bool first = true;
-                //
-                // if (first)
-                // {
-                //     m_tcb->m_ecnState = TcpSocketState::ECN_IDLE;
-                //     m_retxEvent.Cancel();
-                //     first = false;
-                //     return;
-                // }
+                if (m_dropFirst)
+                {
+                    // NOTE: This is a simulated drop of the first SYN-ACK packet retransmit with
+                    //       not-ECT after the first one was marked with CE.
+                    //       Use --DropFirstNotEctSynAck to enable this in `tcp-ecn-example`.
 
-                // NOTE: Uncomment the following to simulate drop on all no-ECT SYN-ACKs
-                //
-                // return;
+                    static bool first = true;
+
+                    if (first)
+                    {
+                        m_tcb->m_ecnState = TcpSocketState::ECN_IDLE;
+                        m_retxEvent.Cancel();
+                        first = false;
+                        return;
+                    }
+                }
+
+                if (m_dropAll)
+                {
+                    // NOTE: This is to simulate a drop on all of the SYN-ACK packets retransmitted
+                    //       with not-ECT in `tcp-ecn-example`.
+                    return;
+                }
             }
         }
 
@@ -2890,28 +2917,36 @@ TcpSocketBase::SendEmptyPacket(uint8_t flags)
 
     NS_ASSERT_MSG(packetType != TcpPacketType_t::INVALID, "Invalid TCP packet type");
 
-    // NOTE: Uncomment this and the next comment to force CE on the first SYN-ACK packet.
-    //
-    // static bool first_synack = true;
-    // if (m_tcb->m_ecnMode == TcpSocketState::EcnpEcn && packetType == TcpPacketType_t::SYN_ACK)
-    // {
-    //     if (first_synack)
-    //     {
-    //         m_tcb->m_ectCodePoint = TcpSocketState::CongExp;
-    //     }
-    //     else
-    //     {
-    //         m_tcb->m_ectCodePoint = TcpSocketState::NotECT;
-    //     }
-    // }
+    static bool __first_synack = true;
+
+    if (m_markSynAck)
+    {
+        // NOTE: This is a simulated marking of the first SYN-ACK packet with CE.
+        //       Use --ceOnFirstSynAck=1 to enable this in `tcp-ecn-example`.
+
+        if (m_tcb->m_ecnMode == TcpSocketState::EcnpEcn && packetType == TcpPacketType_t::SYN_ACK)
+        {
+            if (__first_synack)
+            {
+                m_tcb->m_ectCodePoint = TcpSocketState::CongExp;
+            }
+            else
+            {
+                m_tcb->m_ectCodePoint = TcpSocketState::NotECT;
+            }
+        }
+    }
 
     AddSocketTags(p, IsEct(packetType));
 
-    // if (m_tcb->m_ecnMode == TcpSocketState::EcnpEcn && packetType == TcpPacketType_t::SYN_ACK)
-    // {
-    //     m_tcb->m_ectCodePoint = TcpSocketState::Ect0;
-    //     first_synack = false;
-    // }
+    if (m_markSynAck)
+    {
+        if (m_tcb->m_ecnMode == TcpSocketState::EcnpEcn && packetType == TcpPacketType_t::SYN_ACK)
+        {
+            m_tcb->m_ectCodePoint = TcpSocketState::Ect0;
+            __first_synack = false;
+        }
+    }
 
     header.SetFlags(flags);
     header.SetSequenceNumber(s);

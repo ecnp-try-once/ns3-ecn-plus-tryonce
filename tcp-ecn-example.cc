@@ -48,6 +48,14 @@ main(int argc, char* argv[])
     uint32_t queueSize = 25;    // packets
     double simulationTime = 10; // seconds
 
+    // Simulation Flags
+    bool ceOnFirstSynAck = false;
+    bool dropFirstNotEctSynAck = false;
+    bool dropAllNotEctSynAcks = false;
+
+    LogComponentEnable("TcpEcnExample", LOG_LEVEL_DEBUG);
+    LogComponentEnable("TcpSocketBase", LOG_LEVEL_DEBUG);
+
     // Command line arguments
     CommandLine cmd(__FILE__);
     cmd.AddValue("enableEcn", "Enable ECN", enableEcn);
@@ -59,6 +67,18 @@ main(int argc, char* argv[])
                  queueDiscType);
     cmd.AddValue("queueSize", "Queue size in packets", queueSize);
     cmd.AddValue("simulationTime", "Simulation time in seconds", simulationTime);
+
+    // Simulation Flags
+    cmd.AddValue("ceOnFirstSynAck",
+                 "Mark CE on first SYN-ACK packet sent from receiver",
+                 ceOnFirstSynAck);
+    cmd.AddValue("dropFirstNotEctSynAck",
+                 "Drop first SYN-ACK packet which is not ECT",
+                 dropFirstNotEctSynAck);
+    cmd.AddValue("dropAllNotEctSynAcks",
+                 "Drop all SYN-ACK packets which are not ECT",
+                 dropAllNotEctSynAcks);
+
     cmd.Parse(argc, argv);
 
     // ECN Configuration
@@ -66,6 +86,11 @@ main(int argc, char* argv[])
     {
         NS_LOG_INFO("ECN is enabled for all nodes");
         Config::SetDefault("ns3::TcpSocketBase::UseEcn", EnumValue(TcpSocketState::On));
+        Config::SetDefault("ns3::TcpSocketBase::CeOnFirstSynAck", BooleanValue(ceOnFirstSynAck));
+        Config::SetDefault("ns3::TcpSocketBase::DropFirstNotEctSynAck",
+                           BooleanValue(dropFirstNotEctSynAck));
+        Config::SetDefault("ns3::TcpSocketBase::DropAllNotEctSynAcks",
+                           BooleanValue(dropAllNotEctSynAcks));
         Config::SetDefault("ns3::RedQueueDisc::UseEcn", BooleanValue(true));
         Config::SetDefault("ns3::CoDelQueueDisc::UseEcn", BooleanValue(true));
     }
@@ -73,6 +98,9 @@ main(int argc, char* argv[])
     {
         NS_LOG_INFO("ECN is disabled for all nodes");
         Config::SetDefault("ns3::TcpSocketBase::UseEcn", EnumValue(TcpSocketState::Off));
+        Config::SetDefault("ns3::TcpSocketBase::CeOnFirstSynAck", BooleanValue(false));
+        Config::SetDefault("ns3::TcpSocketBase::DropFirstNotEctSynAck", BooleanValue(false));
+        Config::SetDefault("ns3::TcpSocketBase::DropAllNotEctSynAcks", BooleanValue(false));
         Config::SetDefault("ns3::RedQueueDisc::UseEcn", BooleanValue(false));
         Config::SetDefault("ns3::CoDelQueueDisc::UseEcn", BooleanValue(false));
     }
